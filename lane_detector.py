@@ -3,7 +3,7 @@ import numpy as np
 
 
 class LaneDetector:
-    def __init__(self):
+    def __init__(self, width, height):
         self.mtx = None
         self.dist = None
         self.left_fit_sliding = None
@@ -13,6 +13,20 @@ class LaneDetector:
         self.ym_per_pix = 30 / 720  # meters per pixel in y dimension
         self.xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
         self.ema_alpha = 0.85
+
+        self.perspective_transform_src = np.float32(
+            [[(width / 2) - 60, height / 2 + 100],
+             [((width / 6) - 10), height],
+             [(width * 5 / 6) + 40, height],
+             [(width / 2 + 60), height / 2 + 100]])
+        self.perspective_transform_dst = np.float32(
+            [[(width / 4), 0],
+             [(width / 4), height],
+             [(width * 3 / 4), height],
+             [(width * 3 / 4), 0]])
+
+        self.M = cv2.getPerspectiveTransform(self.perspective_transform_src, self.perspective_transform_dst)
+        self.Minv = cv2.getPerspectiveTransform(self.perspective_transform_dst, self.perspective_transform_src)
 
     def reset(self):
         self.left_fit_sliding = None
@@ -125,28 +139,28 @@ class LaneDetector:
 
         return combined
 
-    def warp_matrices(self, image):
-        h = image.shape[0]
-        w = image.shape[1]
-        trapezoid_top = 456
-        trapezoid_top_margin = 595
-        trapezoid_bottom_margin = 253
+    def warp(self, image):
+        return cv2.warpPerspective(image, self.M, (image.shape[1], image.shape[0]))
 
-        trapezoid = np.float32([[trapezoid_bottom_margin, h], [trapezoid_top_margin, trapezoid_top],
-                                [w - trapezoid_top_margin, trapezoid_top], [w - trapezoid_bottom_margin, h]])
-        new_top_left = np.array([trapezoid[0, 0], 0])
-        new_top_right = np.array([trapezoid[3, 0], 0])
-        offset = [50, 0]
+    def unwarp_binary_and_add_to_image(self, image, binary_warped, ploty, left_fitx, right_fitx):
+        warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
+        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-        src = np.float32([trapezoid[0], trapezoid[1], trapezoid[2], trapezoid[3]])
-        dst = np.float32([trapezoid[0] + offset, new_top_left + offset, new_top_right - offset, trapezoid[3] - offset])
+        # Recast the x and y points into usable format for cv2.fillPoly()
+        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+        pts = np.hstack((pts_left, pts_right))
 
-        M = cv2.getPerspectiveTransform(src, dst)
-        Minv = cv2.getPerspectiveTransform(dst, src)
-        return M, Minv
+        # print(color_warp.shape)
+        # Draw the lane onto the warped blank image
+        cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
-    def warp_perspective(self, image, m):
-        return cv2.warpPerspective(image, m, (image.shape[1], image.shape[0]))
+        # Warp the blank back to original image space using inverse perspective matrix (Minv)
+        newwarp = cv2.warpPerspective(color_warp, self.Minv, (image.shape[1], image.shape[0]))
+        # Combine the result with the original image
+        # print('img shape: ', image.shape, ' warp shape: ', newwarp.shape)
+        result = cv2.addWeighted(image, 1, newwarp, 0.3, 0)
+        return result
 
     def hist(self, img):
         # Grab only the bottom half of the image
@@ -409,6 +423,6 @@ class LaneDetector:
         else:
             direction = 'left'
 
-        cv2.putText(image, 'Vehicle is {:04.3f}m '.format(abs(dist_from_lane_center)) + direction + ' of center',
+        cv2.putText(image, 'Vehicle is {:.2f}m '.format(abs(dist_from_lane_center)) + direction + ' of center',
                     (32, 96), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
         return image
