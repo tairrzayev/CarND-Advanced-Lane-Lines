@@ -1,6 +1,5 @@
-import numpy as np
 import cv2
-import matplotlib.pyplot as plt
+import numpy as np
 
 
 class LaneDetector:
@@ -121,8 +120,8 @@ class LaneDetector:
         s_channel = hls[:, :, 2]
 
         combined[
-            ((s_channel >= 15) & (h_channel >= 10) & (h_channel <= 80) | ((l_channel >= 170) & (l_channel <= 255)) & (
-                    mag_binary == 1) & (dir_binary == 1) & (gradx == 1))] = 1
+            ((s_channel >= 15) & (h_channel >= 10) & (h_channel <= 80) | ((l_channel >= 170) & (l_channel <= 255))) & (
+                    (mag_binary == 1) & (dir_binary == 1) & (gradx == 1))] = 1
 
         return combined
 
@@ -258,7 +257,6 @@ class LaneDetector:
         # Colors in the left and right lane regions
         out_img[lefty, leftx] = [255, 0, 0]
         out_img[righty, rightx] = [0, 0, 255]
-
 
         return ploty, left_fitx, right_fitx, out_img
 

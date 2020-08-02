@@ -8,7 +8,7 @@ Creating a great writeup:
 ---
 A great writeup should include the rubric points as well as your description of how you addressed each point.  You should include a detailed description of the code used in each step (with line-number references and code snippets where necessary), and links to other supporting documents or external references.  You should include images in your writeup to demonstrate how your code works with examples.  
 
-All that said, please be concise!  We're not looking for you to write a book here, just a brief description of how you passed each rubric point, and references to the relevant code :). 
+All that said, please be concise!  We're not looking for you to write a book here, just a brief description of how you passed each rubric point, and references to the relevant code :).
 
 You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup.
 
@@ -63,14 +63,34 @@ The full calibration code can be found in `calibrate()` method of [LaneDetector]
 
 To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
 
-![Undistorted chessboard image](output_images/undistorted_test_image.png)
+![Undistorted test image](test_images/test1.jpg)
+
+I would read the image from the disk, convert it's color space from BGR to RGB, and finally call `undistort()` on [LaneDetector](lane_detector.py), which simply invokes `cv2.undistort()`, passing the matrix and distortion coefficients, calculated during the calibration step:
+
+```
+dist_img = cv2.imread('./test_images/test1.jpg')
+dist_img = cv2.cvtColor(dist_img, cv2.COLOR_BGR2RGB)
+undist = lane_detector.undistort(dist_img)
+```
+
+**The result (side-by-side with the undistorted image) looks like this:**
+![Undistorted test image](output_images/undistorted_test_image.png)
 
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
 
-![alt text][image3]
+I used Saturation and Hue channels primarily to detect the yellow lines. Lightness - to detect the white lines. Because thresholding only by color captures a lot of extra noise, the HSL thresholding result is AND-ed with thresholded Sobel (x-direction), gradient magnitude and direction. The thresholded binary image is returned by `binary_image()` method of `LaneDetector` in [LaneDetector](lane_detector.py).
+
+ Here's an example of my output for this step:
+
+**Original vs Thresholded frame #30 from the project video:**
+![Thresholded frame #30 from the project video](output_images/thresholded_project_video_frame.png)
+
+**Original vs Thresholded frame #30 from the challenge video:**
+![Thresholded frame #30 from the challenge video](output_images/thresholded_challenge_video_frame.png)
+
+Notice that in the challenge video the darker tar line, going in parallel with the right dashed lane line is not picked up even though it has high gradient magnitude & matching direction. This is because the image is also thresholded by lightness and saturation so the darker / colourless regions (which usually contain little information anyway) are not picked up.
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
@@ -91,9 +111,9 @@ dst = np.float32(
 
 This resulted in the following source and destination points:
 
-| Source        | Destination   | 
-|:-------------:|:-------------:| 
-| 585, 460      | 320, 0        | 
+| Source        | Destination   |
+|:-------------:|:-------------:|
+| 585, 460      | 320, 0        |
 | 203, 720      | 320, 720      |
 | 1127, 720     | 960, 720      |
 | 695, 460      | 960, 0        |
